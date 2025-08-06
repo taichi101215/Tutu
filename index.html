@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>本物の重力・リアル玉パズル（改善）</title>
+<style>
+  body{ background: #eee; }
+  canvas { background: #fff; border: 1px solid #999; display: block; margin: 20px auto;}
+</style>
+</head>
+<body>
+<h3>滑らかな重力シミュ（見失い防止版）</h3>
+<canvas id="cv" width="300" height="400"></canvas>
+<button onclick="resetBalls()">リセット</button>
+<script>
+const R = 18;
+const W = 300, H = 400, BALL_NUM = 12;  // 数は必要に応じて調整
+const COLORS = ["#daa", "#aaf", "#ffb", "#aee", "#ecc"];
+const emojis = ["🐼","🐶","🐰","🐸","🐷"];
+let balls = [];
+
+function resetBalls() {
+  balls = [];
+  // 初期配置をグリッド状にして重なりを防止（不过「配列」は使わない）
+  const startRows = 3, startCols = 4, marginY = 30, marginX = 30;
+  let k = 0;
+  for(let row=0;row<startRows;row++)
+    for(let col=0;col<startCols;col++) {
+      if(k++>=BALL_NUM) break;
+      let spacingX = (W - marginX*2)/(startCols-1);
+      let spacingY = (H/2 - marginY*2)/(startRows-1);
+      balls.push({
+        x: marginX + spacingX*col + (Math.random()-0.5)*6, // 少し揺らす
+        y: marginY + spacingY*row + (Math.random()-0.5)*6,
+        vx: 0,
+        vy: 0,
+        color: COLORS[Math.floor(Math.random()*COLORS.length)],
+        emoji: emojis[Math.floor(Math.random()*emojis.length)],
+        weight: Math.floor(Math.random()*5)+1,
+        fixed: false // 静止したか
+      });
+    }
+}
+resetBalls();
+
+function overlap(b1, b2) {
+  let dx = b1.x - b2.x, dy = b1.y - b2.y;
+  return dx*dx + dy*dy < (2*R-1)*(2*R-1);
+}
+
+function simulatePhysics() {
+  for(let b of balls){
+    if (b.fixed) continue;
+    b.vy += 0.45; //重力加速度
+    b.x += b.vx;
+    b.y += b.vy;
+    // 床
+    if (b.y > H-R-3) {  // 画面下ギリギリで止まる
+      b.y = H-R-3;
+      b.vy *= -0.35;
+      if (Math.abs(b.vy) < 1.2) b.vy=0, b.fixed=true;
+    }
+    // 壁
+    if (b.x < R) { b.x=R; b.vx*=-0.4;}
+    if (b.x > W-R) { b.x=W-R; b.vx*=-0.4;}
+  }
+  // 衝突
+  for(let i=0;i<balls.length;i++)for(let j=i+1;j<balls.length;j++){
+    let b1=balls[i], b2=balls[j];
+    let dx = b2.x-b1.x, dy = b2.y-b1.y;
+    let dist = Math.sqrt(dx*dx+dy*dy);
+    if(dist<2*R-1 && dist>0.5){
+      let ov = 2*R-dist;
+      let nx = dx/dist, ny = dy/dist;
+      b1.x -= nx*ov/2;
+      b1.y -= ny*ov/2;
+      b2.x += nx*ov/2;
+      b2.y += ny*ov/2;
+      // 球同士の力
+      let dot = (b2.vx-b1.vx)*nx+(b2.vy-b1.vy)*ny;
+      b1.vx += dot*nx*0.2;
+      b1.vy += dot*ny*0.2;
+      b2.vx -= dot*nx*0.2;
+      b2.vy -= dot*ny*0.2;
+    }
+  }
+}
+
+function draw() {
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  for(let b of balls){
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,R,0,Math.PI*2);
+    ctx.fillStyle = b.color;
+    ctx.fill();
+    ctx.stroke();
+    ctx.font="21px serif";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillStyle="#444";
+    ctx.fillText(b.emoji, b.x, b.y);
+    ctx.font="11px sans-serif";
+    ctx.fillText(b.weight, b.x+R-7, b.y+R-8);
+  }
+}
+
+function loop() {
+  simulatePhysics();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+<p>初期玉の数や配置幅を調整、見失い防止と滑らかさ両立版。</p>
+</body>
+</html>
